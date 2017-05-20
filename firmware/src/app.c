@@ -49,6 +49,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 // *****************************************************************************
 
 #include "app.h"
+#include "i2c_lib.h"
+#include "lcd_lib.h"
 
 
 // *****************************************************************************
@@ -70,6 +72,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
  */
 
 APP_DATA appData;
+short data[7];
 
 /* Mouse Report */
 MOUSE_REPORT mouseReport APP_MAKE_BUFFER_DMA_READY;
@@ -265,9 +268,9 @@ void APP_Initialize(void) {
  */
 
 void APP_Tasks(void) {
-    static int8_t vector = 0;
-    static uint8_t movement_length = 0;
-    int8_t dir_table[] = {-4, -4, -4, 0, 4, 4, 4, 0};
+    int x, y;
+    static uint8_t inc=0;
+    static uint8_t ck=0;
 
     /* Check the application's current state. */
     switch (appData.state) {
@@ -305,13 +308,25 @@ void APP_Tasks(void) {
         case APP_STATE_MOUSE_EMULATE:
             
             // every 50th loop, or 20 times per second
-            if (movement_length > 50) {
-                appData.mouseButton[0] = MOUSE_BUTTON_STATE_RELEASED;
-                appData.mouseButton[1] = MOUSE_BUTTON_STATE_RELEASED;
-                appData.xCoordinate = (int8_t) dir_table[vector & 0x07];
-                appData.yCoordinate = (int8_t) dir_table[(vector + 2) & 0x07];
-                vector++;
-                movement_length = 0;
+            if (inc > 250) {
+                IMU_read_multiple(0x20, IMU_ADD, data, 7);
+                appData.mouseButton[0]=MOUSE_BUTTON_STATE_RELEASED;
+                appData.mouseButton[1]=MOUSE_BUTTON_STATE_RELEASED;
+                x=3*data[4]/5461;
+                y=3*data[5]/5461;
+                appData.xCoordinate = (int8_t) x;
+                appData.yCoordinate = (int8_t) y;
+            }
+            
+            inc=inc+1;
+            
+            while(!PORTBbits.RB4){
+                while(ck==0){
+                    if(!PORTBbits.RB4){
+                        ck=1;
+                    }
+                }
+                ck=0;
             }
 
             if (!appData.isMouseReportSendBusy) {
@@ -364,7 +379,7 @@ void APP_Tasks(void) {
                             sizeof (MOUSE_REPORT));
                     appData.setIdleTimer = 0;
                 }
-                movement_length++;
+            
             }
 
             break;
