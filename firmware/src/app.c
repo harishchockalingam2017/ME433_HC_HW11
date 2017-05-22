@@ -258,6 +258,7 @@ void APP_Initialize(void) {
     //appData.emulateMouse = true;
     appData.hidInstance = 0;
     appData.isMouseReportSendBusy = false;
+    I2C_master_setup();
 }
 
 /******************************************************************************
